@@ -4,8 +4,9 @@ from datetime import datetime
 import xlsxwriter
 from io import BytesIO
 
-# Add the logo at the top of the app
-st.image("ilogo.png", width=200)
+
+# Display the logo at the top of the app
+st.image("Ilogo.png", width=200)  # Adjust the width as needed
 
 # Title for the app
 st.title("SWR Cutlist")
@@ -13,7 +14,7 @@ st.title("SWR Cutlist")
 # Project details input fields
 project_name = st.text_input("Enter Project Name")
 project_number = st.text_input("Enter Project Number")
-
+profile_number = st.number_input("Enter Profile Number", step=1)
 # System Type selection with automatic Glass Offset logic
 system_type = st.selectbox("Select System Type", ["SWR-IG", "SWR-VIG", "SWR", "Custom"])
 
@@ -29,20 +30,28 @@ else:
 if system_type != "Custom":
     st.write(f"Using a Glass Offset of {glass_offset} inches for system type {system_type}")
 
-# Additional project details input fields
-glass_cutting_tolerance = st.number_input("Enter Glass Cutting Tolerance (in inches)", value=0.1)
+# Additional project details input fields with default values and 3 decimal places
+glass_cutting_tolerance = st.number_input("Enter Glass Cutting Tolerance (in inches)", value=0.625, format="%.3f")
+joint_top = st.number_input("Enter the Joint Top (in inches)", value=0.5, format="%.3f")
+joint_bottom = st.number_input("Enter the Joint Bottom (in inches)", value=0.125, format="%.3f")
+joint_left = st.number_input("Enter the Joint Left (in inches)", value=0.25, format="%.3f")
+joint_right = st.number_input("Enter the Joint Right (in inches)", value=0.25, format="%.3f")
 
-# Joint values input fields
-joint_top = st.number_input("Enter the Joint Top (in inches)", value=0.0)
-joint_bottom = st.number_input("Enter the Joint Bottom (in inches)", value=0.0)
-joint_left = st.number_input("Enter the Joint Left (in inches)", value=0.0)
-joint_right = st.number_input("Enter the Joint Right (in inches)", value=0.0)
+# File upload
+uploaded_file = st.file_uploader("Upload a CSV file", type="csv")
+
+# Provide a download button for the template file
+with open("SWR template.csv", "rb") as template_file:
+    template_data = template_file.read()
+st.download_button(
+    label="Download Template File",
+    data=template_data,
+    file_name="SWR_template.csv",
+    mime="text/csv"
+)
 
 # Date creation for headers
 creation_date = datetime.now().strftime('%Y-%m-%d')
-
-# File upload
-uploaded_file = st.file_uploader("Upload your Opening .csv file", type="csv")
 
 if uploaded_file is not None:
     # Load the CSV data
@@ -77,8 +86,16 @@ if uploaded_file is not None:
     glass_offset_mm = glass_offset * inches_to_mm
     df['Glass Width mm'] = df['SWR Width mm'] - (2 * glass_offset_mm)
     df['Glass Height mm'] = df['SWR Height mm'] - (2 * glass_offset_mm)
+
+    # Define the rounding function
+    def round_to_nearest(value, base=0.0625):
+        return round(value / base) * base
+
+    # Calculate Glass Width and Height in inches and round to nearest 0.0625
     df['Glass Width in'] = df['Glass Width mm'] * mm_to_inches
     df['Glass Height in'] = df['Glass Height mm'] * mm_to_inches
+    df['Glass Width in'] = df['Glass Width in'].apply(round_to_nearest)
+    df['Glass Height in'] = df['Glass Height in'].apply(round_to_nearest)
 
     # ==================== Glass File Export ====================
     output_df = pd.DataFrame({'Item': range(1, len(df) + 1)})
@@ -110,10 +127,10 @@ if uploaded_file is not None:
     unique_dimensions = pd.Index(width_counts.index.tolist() + height_counts.index.tolist()).unique()
 
     # Prepare the AggCutOnly DataFrame
-    agg_df = pd.DataFrame(0, index=unique_dimensions, columns=['Finished Length in', 'Part #', 'Miter'] + df['Tag'].unique().tolist() + ['Total QTY'])
-    agg_df['Finished Length in'] = agg_df.index
+    agg_df = pd.DataFrame(0, index=unique_dimensions, columns=['Part #', 'Miter', 'Finished Length in'] + df['Tag'].unique().tolist() + ['Total QTY'])
     agg_df['Part #'] = project_number
     agg_df['Miter'] = "**"
+    agg_df['Finished Length in'] = agg_df.index
 
     for i, row in df.iterrows():
         width, height, tag, qty_x_2 = row['SWR Width in'], row['SWR Height in'], row['Tag'], row['Qty x 2']
@@ -127,9 +144,11 @@ if uploaded_file is not None:
 
     # Add a totals row for the AggCutOnly file
     totals_row = pd.DataFrame([{
+        'Part #': None,
+        'Miter': None,
         'Finished Length in': 'Total',
-        **{col: agg_df[col].sum() for col in agg_df.columns if col not in ['Finished Length in', 'Part #', 'Miter']}
-    }])
+      **{col: agg_df[col].sum() for col in agg_df.columns if col not in ['Part #', 'Miter', 'Finished Length in']}
+}])
     agg_df = pd.concat([agg_df, totals_row], ignore_index=True)
 
     agg_file = BytesIO()
@@ -142,21 +161,37 @@ if uploaded_file is not None:
         worksheet.write('B2', project_number)
         worksheet.write('B3', creation_date)
         agg_df.to_excel(writer, sheet_name='Sheet1', startrow=6, index=False)
-
     # ==================== TagDetails File Export ====================
     tag_file = BytesIO()
     with pd.ExcelWriter(tag_file, engine='xlsxwriter') as writer:
         for tag in df['Tag'].unique():
             tag_df = df[df['Tag'] == tag]
-            table_data = {'Item': [], 'Position': [], 'Quantity': [], 'Length (mm)': [], 'Length (inch)': []}
+        
+            # Initialize the table data with new columns for Type and Profile #
+            table_data = {
+                'Item': [],
+                'Type': [],
+                'Profile #': [],
+                'Position': [],
+                'Quantity': [],
+                'Length (mm)': [],
+             'Length (inch)': []
+          }
+        
             for idx, row in tag_df.iterrows():
                 swr_width_mm, swr_height_mm, swr_width_in, swr_height_in = row['SWR Width mm'], row['SWR Height mm'], row['SWR Width in'], row['SWR Height in']
                 qty_x2 = row['Qty'] * 2
+
+            # Populate Item, Type, and Profile # for each position (left, right, top, bottom)
                 table_data['Item'].extend([idx + 1, idx + 1, idx + 1, idx + 1])
+                table_data['Type'].extend(['Alum Profile'] * 4)
+                table_data['Profile #'].extend([profile_number] * 4)
                 table_data['Position'].extend(['left', 'right', 'top', 'bottom'])
                 table_data['Quantity'].extend([qty_x2, qty_x2, qty_x2, qty_x2])
                 table_data['Length (mm)'].extend([swr_width_mm, swr_width_mm, swr_height_mm, swr_height_mm])
                 table_data['Length (inch)'].extend([swr_width_in, swr_width_in, swr_height_in, swr_height_in])
+
+        # Create a DataFrame from table_data and export each tag to a separate sheet
             tag_output_df = pd.DataFrame(table_data)
             worksheet = writer.book.add_worksheet(str(tag))
             worksheet.write('A1', "Project Name:")
