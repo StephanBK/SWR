@@ -6,7 +6,7 @@ from io import BytesIO
 
 
 # Display the logo at the top of the app
-st.image("Ilogo.png", width=200)  # Adjust the width as needed
+st.image("ilogo.png", width=200)  # Adjust the width as needed
 
 # Title for the app
 st.title("SWR Cutlist")
@@ -36,6 +36,10 @@ joint_top = st.number_input("Enter the Joint Top (in inches)", value=0.5, format
 joint_bottom = st.number_input("Enter the Joint Bottom (in inches)", value=0.125, format="%.3f")
 joint_left = st.number_input("Enter the Joint Left (in inches)", value=0.25, format="%.3f")
 joint_right = st.number_input("Enter the Joint Right (in inches)", value=0.25, format="%.3f")
+
+# Combine System Type and Project Number
+
+part_number = f"{system_type}-{profile_number}"
 
 # File upload
 uploaded_file = st.file_uploader("Upload a CSV file", type="csv")
@@ -116,7 +120,7 @@ if uploaded_file is not None:
         worksheet.write('A2', "Project Number:")
         worksheet.write('A3', "Date Created:")
         worksheet.write('B1', project_name)
-        worksheet.write('B2', project_number)
+        worksheet.write('B2', part_number)
         worksheet.write('B3', creation_date)
         output_df.to_excel(writer, sheet_name='Sheet1', startrow=6, index=False)
 
@@ -128,10 +132,14 @@ if uploaded_file is not None:
 
     # Prepare the AggCutOnly DataFrame
     agg_df = pd.DataFrame(0, index=unique_dimensions, columns=['Part #', 'Miter', 'Finished Length in'] + df['Tag'].unique().tolist() + ['Total QTY'])
-    agg_df['Part #'] = project_number
+
+    # Set all values in the 'Part #' column to the new part_number
+    agg_df['Part #'] = part_number  # This ensures all rows have the new part number
+
     agg_df['Miter'] = "**"
     agg_df['Finished Length in'] = agg_df.index
 
+    # Process each row to populate the tags
     for i, row in df.iterrows():
         width, height, tag, qty_x_2 = row['SWR Width in'], row['SWR Height in'], row['Tag'], row['Qty x 2']
         if width in agg_df.index and tag in agg_df.columns:
@@ -147,8 +155,8 @@ if uploaded_file is not None:
         'Part #': None,
         'Miter': None,
         'Finished Length in': 'Total',
-      **{col: agg_df[col].sum() for col in agg_df.columns if col not in ['Part #', 'Miter', 'Finished Length in']}
-}])
+        **{col: agg_df[col].sum() for col in agg_df.columns if col not in ['Part #', 'Miter', 'Finished Length in']}
+    }])
     agg_df = pd.concat([agg_df, totals_row], ignore_index=True)
 
     agg_file = BytesIO()
@@ -158,7 +166,7 @@ if uploaded_file is not None:
         worksheet.write('A2', "Project Number:")
         worksheet.write('A3', "Date Created:")
         worksheet.write('B1', project_name)
-        worksheet.write('B2', project_number)
+        worksheet.write('B2', part_number)  # Use part_number here as well
         worksheet.write('B3', creation_date)
         agg_df.to_excel(writer, sheet_name='Sheet1', startrow=6, index=False)
     # ==================== TagDetails File Export ====================
@@ -175,30 +183,30 @@ if uploaded_file is not None:
                 'Position': [],
                 'Quantity': [],
                 'Length (mm)': [],
-             'Length (inch)': []
-          }
+                'Length (inch)': []
+            }
         
             for idx, row in tag_df.iterrows():
                 swr_width_mm, swr_height_mm, swr_width_in, swr_height_in = row['SWR Width mm'], row['SWR Height mm'], row['SWR Width in'], row['SWR Height in']
                 qty_x2 = row['Qty'] * 2
 
-            # Populate Item, Type, and Profile # for each position (left, right, top, bottom)
+                # Populate Item, Type, and Profile # for each position (left, right, top, bottom)
                 table_data['Item'].extend([idx + 1, idx + 1, idx + 1, idx + 1])
                 table_data['Type'].extend(['Alum Profile'] * 4)
-                table_data['Profile #'].extend([profile_number] * 4)
+                table_data['Profile #'].extend([part_number] * 4)  # Set Profile # to part_number
                 table_data['Position'].extend(['left', 'right', 'top', 'bottom'])
                 table_data['Quantity'].extend([qty_x2, qty_x2, qty_x2, qty_x2])
                 table_data['Length (mm)'].extend([swr_width_mm, swr_width_mm, swr_height_mm, swr_height_mm])
                 table_data['Length (inch)'].extend([swr_width_in, swr_width_in, swr_height_in, swr_height_in])
 
-        # Create a DataFrame from table_data and export each tag to a separate sheet
+            # Create a DataFrame from table_data and export each tag to a separate sheet
             tag_output_df = pd.DataFrame(table_data)
             worksheet = writer.book.add_worksheet(str(tag))
             worksheet.write('A1', "Project Name:")
             worksheet.write('A2', "Project Number:")
             worksheet.write('A3', "Date Created:")
             worksheet.write('B1', project_name)
-            worksheet.write('B2', project_number)
+            worksheet.write('B2', part_number)  # Use part_number here for project reference
             worksheet.write('B3', creation_date)
             tag_output_df.to_excel(writer, sheet_name=str(tag), startrow=6, index=False)
 
