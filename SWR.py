@@ -17,7 +17,7 @@ st.image("ilogo.png", width=200)  # Adjust the width as needed
 st.title("SWR Cutlist")
 
 # Project details input fields
-project_name = st.text_input("Enter Project Name")
+project_name = st.text_input("Enter Project Name", value="INO-")
 project_number = st.text_input("Enter Project Number")
 
 # System Type selection with automatic Glass Offset logic
@@ -243,8 +243,8 @@ if uploaded_file:
         df.to_excel(writer, sheet_name='Sheet1', startrow=12, index=False)
 
     # Provide download buttons for each file with the updated filenames
-    prefix = f"INO_{project_number}_"
+    prefix = f"INO_{project_number}_SWR_"
     st.download_button("Download Glass File", data=glass_file.getvalue(), file_name=f"{prefix}Glass.xlsx")
     st.download_button("Download AggCutOnly File", data=agg_file.getvalue(), file_name=f"{prefix}AggCutOnly.xlsx")
     st.download_button("Download TagDetails File", data=tag_file.getvalue(), file_name=f"{prefix}TagDetails.xlsx")
-    st.download_button("Download SWR Table File", data=swr_table_file.getvalue(), file_name=f"{prefix}SWR_table.xlsx")
+    st.download_button("Download SWR Table File", data=swr_table_file.getvalue(), file_name=f"{prefix}Table.xlsx")
