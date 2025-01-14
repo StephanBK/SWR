@@ -138,22 +138,45 @@ if uploaded_file:
     # ==================== Glass File Export ====================
     output_df = pd.DataFrame({'Item': range(1, len(df) + 1)})
     output_df['Glass Width in'] = df['Glass Width in']
+    output_df['Glass Width (nearest 1/16)'] = df['Glass Width in'].apply(
+        lambda x: f"{int(round(x * 16)) // 16} {int(round(x * 16)) % 16}/16" if round(
+            x * 16) % 16 != 0 else f"{int(round(x))}"
+    )
     output_df['Glass Height in'] = df['Glass Height in']
+    output_df['Glass Height (nearest 1/16)'] = df['Glass Height in'].apply(
+        lambda x: f"{int(round(x * 16)) // 16} {int(round(x * 16)) % 16}/16" if round(
+            x * 16) % 16 != 0 else f"{int(round(x))}"
+    )
     output_df['Area Each (ft²)'] = (output_df['Glass Width in'] * output_df['Glass Height in']) * sq_inches_to_sq_feet
     output_df['Qty'] = df['Qty']
     output_df['Area Total (ft²)'] = output_df['Qty'] * output_df['Area Each (ft²)']
-    totals_row = pd.DataFrame([['Totals', None, None, None, output_df['Qty'].sum(), output_df['Area Total (ft²)'].sum()]],
-                              columns=output_df.columns)
+
+    # Add totals row with correct number of columns
+    totals_row = pd.DataFrame(
+        [[
+            'Totals',  # Item
+            None,  # Glass Width in
+            None,  # Glass Width (nearest 1/16)
+            None,  # Glass Height in
+            None,  # Glass Height (nearest 1/16)
+            None,  # Area Each (ft²)
+            output_df['Qty'].sum(),  # Qty
+            output_df['Area Total (ft²)'].sum()  # Area Total (ft²)
+        ]],
+        columns=output_df.columns
+    )
+
+    # Concatenate totals row to the output DataFrame
     output_df = pd.concat([output_df, totals_row], ignore_index=True)
 
     # Save to Excel and prepare for download
     glass_file = BytesIO()
     with pd.ExcelWriter(glass_file, engine='xlsxwriter') as writer:
         worksheet = writer.book.add_worksheet("Sheet1")
-        
+
         # Insert logo
         worksheet.insert_image('A1', 'ilogo.png', {'x_scale': 0.2, 'y_scale': 0.2})
-        
+
         worksheet.write('A7', "Project Name:")
         worksheet.write('A8', "Project Number:")
         worksheet.write('A9', "Date Created:")
