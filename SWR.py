@@ -17,8 +17,8 @@ st.image("ilogo.png", width=200)  # Adjust the width as needed
 st.title("SWR Cutlist")
 
 # Project details input fields
-project_name = st.text_input("Enter Project Name", value="INO-")
-project_number = st.text_input("Enter Project Number")
+project_name = st.text_input("Enter Project Name")
+project_number = st.text_input("Enter Project Number", value="INO-")  # Add the default value here
 
 # System Type selection with automatic Glass Offset logic
 system_type = st.selectbox("Select System Type", ["SWR-IG", "SWR-VIG", "SWR", "Custom"])
