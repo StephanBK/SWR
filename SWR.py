@@ -263,7 +263,7 @@ if uploaded_file:
         worksheet.write('B7', project_name)
         worksheet.write('B8', project_number)
         worksheet.write('B9', datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        df.to_excel(writer, sheet_name='Sheet1', startrow=12, index=False)
+        df.drop(columns=["Qty x 2"], errors="ignore").to_excel(writer, sheet_name='Sheet1', startrow=12, index=False)
 
     # Provide download buttons for each file with the updated filenames
     prefix = f"INO_{project_number}_SWR_"
