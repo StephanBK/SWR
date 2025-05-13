@@ -1,96 +1,114 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-import xlsxwriter
 from io import BytesIO
-import os
 
 # Conversion constants
 inches_to_mm = 25.4
 mm_to_inches = 1 / inches_to_mm
 sq_inches_to_sq_feet = 1 / 144
 
-# Display the logo at the top of the app
+# Display logo and title
 st.image("ilogo.png", width=200)
-
-# Title for the app
 st.title("SWR Cutlist")
 
-# Project details input fields
+# Project details inputs
 project_name = st.text_input("Enter Project Name")
 project_number = st.text_input("Enter Project Number", value="INO-")
-prepared_by = st.text_input("Prepared By")  # ← new field
+prepared_by = st.text_input("Prepared By")
 
-# System Type selection with automatic Glass Offset logic
+# System type and finish
 system_type = st.selectbox("Select System Type", ["SWR-IG", "SWR-VIG", "SWR", "Custom"])
 finish = st.selectbox("Select Finish", ["Mil Finish", "Clear Anodized", "Black Anodized", "Painted"])
 
-# Set default Glass Offset and assign profile number based on the selected system type
-if system_type == "SWR-IG":
+# Determine Glass Offset and profile number
+offset_unit = 'mm'
+if system_type == 'SWR-IG':
     glass_offset = 11.1125
     profile_number = '03003'
-elif system_type == "SWR-VIG":
+elif system_type == 'SWR-VIG':
     glass_offset = 11.1125
     profile_number = '03004'
-elif system_type == "SWR":
+elif system_type == 'SWR':
     glass_offset = 7.571
     profile_number = '03002'
 else:
     unit_offset = st.radio("Select Unit for Glass Offset", ["Inches", "Millimeters"], index=0)
-    if unit_offset == "Inches":
+    if unit_offset == 'Inches':
         glass_offset = st.number_input("Enter Glass Offset (in inches)", value=0.0) * inches_to_mm
+        offset_unit = 'inches'
     else:
         glass_offset = st.number_input("Enter Glass Offset (in mm)", value=0.0)
+        offset_unit = 'mm'
 
-if system_type != "Custom":
-    st.write(f"Using a Glass Offset of {glass_offset:.3f} mm for system {system_type} (Profile {profile_number})")
+if system_type != 'Custom':
+    st.write(f"Using a Glass Offset of {glass_offset:.3f} mm for system {system_type}")
 
-# Input Parameters section
-st.subheader("Input Parameters")
-
-unit_tolerance = st.radio("Select Unit for Glass Cutting Tolerance", ["Inches", "Millimeters"], index=0)
-if unit_tolerance == "Inches":
+# Input parameters and units
+unit_tolerance = st.radio("Unit for Glass Cutting Tolerance", ["Inches", "Millimeters"], index=0)
+tol_unit = 'inches' if unit_tolerance == 'Inches' else 'mm'
+if unit_tolerance == 'Inches':
     glass_cutting_tolerance = st.number_input("Enter Glass Cutting Tolerance (in inches)", value=0.0625, format="%.4f")
 else:
     val_mm = st.number_input("Enter Glass Cutting Tolerance (in mm)", value=0.0625 * inches_to_mm, format="%.3f")
     glass_cutting_tolerance = val_mm * mm_to_inches
 
-unit_joint_top = st.radio("Select Unit for Joint Top", ["Inches", "Millimeters"], index=0)
-if unit_joint_top == "Inches":
+unit_joint_top = st.radio("Unit for Joint Top", ["Inches", "Millimeters"], index=0)
+top_unit = 'inches' if unit_joint_top == 'Inches' else 'mm'
+if unit_joint_top == 'Inches':
     joint_top = st.number_input("Enter Joint Top (in inches)", value=0.5, format="%.3f")
 else:
     val_mm = st.number_input("Enter Joint Top (in mm)", value=0.5 * inches_to_mm, format="%.3f")
     joint_top = val_mm * mm_to_inches
 
-unit_joint_bottom = st.radio("Select Unit for Joint Bottom", ["Inches", "Millimeters"], index=0)
-if unit_joint_bottom == "Inches":
+unit_joint_bottom = st.radio("Unit for Joint Bottom", ["Inches", "Millimeters"], index=0)
+bottom_unit = 'inches' if unit_joint_bottom == 'Inches' else 'mm'
+if unit_joint_bottom == 'Inches':
     joint_bottom = st.number_input("Enter Joint Bottom (in inches)", value=0.125, format="%.3f")
 else:
     val_mm = st.number_input("Enter Joint Bottom (in mm)", value=0.125 * inches_to_mm, format="%.3f")
     joint_bottom = val_mm * mm_to_inches
 
-unit_joint_left = st.radio("Select Unit for Joint Left", ["Inches", "Millimeters"], index=0)
-if unit_joint_left == "Inches":
+unit_joint_left = st.radio("Unit for Joint Left", ["Inches", "Millimeters"], index=0)
+left_unit = 'inches' if unit_joint_left == 'Inches' else 'mm'
+if unit_joint_left == 'Inches':
     joint_left = st.number_input("Enter Joint Left (in inches)", value=0.25, format="%.3f")
 else:
     val_mm = st.number_input("Enter Joint Left (in mm)", value=0.25 * inches_to_mm, format="%.3f")
     joint_left = val_mm * mm_to_inches
 
-unit_joint_right = st.radio("Select Unit for Joint Right", ["Inches", "Millimeters"], index=0)
-if unit_joint_right == "Inches":
+unit_joint_right = st.radio("Unit for Joint Right", ["Inches", "Millimeters"], index=0)
+right_unit = 'inches' if unit_joint_right == 'Inches' else 'mm'
+if unit_joint_right == 'Inches':
     joint_right = st.number_input("Enter Joint Right (in inches)", value=0.25, format="%.3f")
 else:
     val_mm = st.number_input("Enter Joint Right (in mm)", value=0.25 * inches_to_mm, format="%.3f")
     joint_right = val_mm * mm_to_inches
 
-# Part number
-part_number = f"{system_type}-{profile_number}"
+# Determine part number
+part_number = f"{system_type}-{profile_number}" if system_type != 'Custom' else 'Custom'
 
-# File upload & template download
-uploaded_file = st.file_uploader("Upload a CSV file", type="csv")
-with open("SWR template.csv", "rb") as template_file:
-    st.download_button("Download Template", template_file.read(), "SWR_template.csv", "text/csv")
+# Download template
+template_path = 'SWR template.csv'
+st.download_button('Download Template', data=open(template_path, 'rb').read(), file_name='SWR_template.csv', mime='text/csv')
 
+# File upload
+uploaded_file = st.file_uploader('Upload a CSV file', type='csv')
+
+# Prepare parameters rows
+params = [
+    ('Prepared By', prepared_by, ''),
+    ('System Type', system_type, ''),
+    ('Finish', finish, ''),
+    ('Glass Offset', glass_offset, offset_unit),
+    ('Glass Cutting Tolerance', glass_cutting_tolerance, tol_unit),
+    ('Joint Top', joint_top, top_unit),
+    ('Joint Bottom', joint_bottom, bottom_unit),
+    ('Joint Left', joint_left, left_unit),
+    ('Joint Right', joint_right, right_unit)
+]
+
+# Process when file uploaded
 if uploaded_file:
     df = pd.read_csv(uploaded_file)
     st.dataframe(df)
@@ -103,132 +121,141 @@ if uploaded_file:
     j_t = joint_top * inches_to_mm
     j_b = joint_bottom * inches_to_mm
 
+    # SWR dims
     df['SWR Width mm'] = df['Overall Width mm'] - j_l - j_r
     df['SWR Height mm'] = df['Overall Height mm'] - j_t - j_b
     df['SWR Width in'] = df['SWR Width mm'] * mm_to_inches
     df['SWR Height in'] = df['SWR Height mm'] * mm_to_inches
 
-    df['Glass Width mm'] = df['SWR Width mm'] - (2 * glass_offset)
-    df['Glass Height mm'] = df['SWR Height mm'] - (2 * glass_offset)
+    # Glass dims
+    df['Glass Width mm'] = df['SWR Width mm'] - 2 * glass_offset
+    df['Glass Height mm'] = df['SWR Height mm'] - 2 * glass_offset
     df['Glass Width in'] = df['Glass Width mm'] * mm_to_inches
     df['Glass Height in'] = df['Glass Height mm'] * mm_to_inches
 
+    # Helper: sixteenth rounding
+    def to_sixteenth(x):
+        total = round(x * 16)
+        w, f = divmod(total, 16)
+        return f"{w} {f}/16" if f else f"{w}"
+
     # --- Glass File Export ---
-    output_df = pd.DataFrame({'Item': range(1, len(df) + 1)})
-    output_df['Glass Width in'] = df['Glass Width in']
-    output_df['Glass Width (nearest 1/16)'] = output_df['Glass Width in'].apply(
-        lambda x: f"{int(round(x * 16))//16} {int(round(x * 16))%16}/16" if round(x * 16)%16 else f"{int(round(x))}"
-    )
-    output_df['Glass Height in'] = df['Glass Height in']
-    output_df['Glass Height (nearest 1/16)'] = output_df['Glass Height in'].apply(
-        lambda x: f"{int(round(x * 16))//16} {int(round(x * 16))%16}/16" if round(x * 16)%16 else f"{int(round(x))}"
-    )
-    output_df['Area Each (ft²)'] = (output_df['Glass Width in'] * output_df['Glass Height in']) * sq_inches_to_sq_feet
-    output_df['Qty'] = df['Qty']
-    output_df['Area Total (ft²)'] = output_df['Qty'] * output_df['Area Each (ft²)']
+    glass_df = pd.DataFrame({
+        'Item': range(1, len(df) + 1),
+        'Glass Width in': df['Glass Width in'],
+        'Glass Width (1/16)': df['Glass Width in'].apply(to_sixteenth),
+        'Glass Height in': df['Glass Height in'],
+        'Glass Height (1/16)': df['Glass Height in'].apply(to_sixteenth),
+        'Area Each (ft²)': (df['Glass Width in'] * df['Glass Height in']) * sq_inches_to_sq_feet,
+        'Qty': df['Qty'],
+        'Area Total (ft²)': df['Qty'] * (df['Glass Width in'] * df['Glass Height in']) * sq_inches_to_sq_feet
+    })
+    # Add totals row
+    totals = pd.DataFrame([{col: (glass_df[col].sum() if col in ['Qty', 'Area Total (ft²)'] else None) for col in glass_df.columns}])
+    totals.at[0, 'Item'] = 'Totals'
+    glass_df = pd.concat([glass_df, totals], ignore_index=True)
 
-    totals = pd.DataFrame(
-        [['Totals', None, None, None, None, None,
-          output_df['Qty'].sum(), output_df['Area Total (ft²)'].sum()]],
-        columns=output_df.columns
-    )
-    output_df = pd.concat([output_df, totals], ignore_index=True)
-
-    glass_file = BytesIO()
-    with pd.ExcelWriter(glass_file, engine='xlsxwriter') as writer:
-        ws = writer.book.add_worksheet("Sheet1")
-        ws.insert_image('A1', 'ilogo.png', {'x_scale':0.2,'y_scale':0.2})
-        ws.write('A7', "Project Name:");      ws.write('B7', project_name)
-        ws.write('A8', "Project Number:");    ws.write('B8', project_number)
-        ws.write('A9', "Date Created:");      ws.write('B9', datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        ws.write('A10',"Prepared By:");       ws.write('B10', prepared_by)
-        output_df.to_excel(writer, sheet_name='Sheet1', startrow=12, index=False)
-
-    st.download_button("Download Glass File", data=glass_file.getvalue(),
-                       file_name=f"INO_{project_number}_SWR_Glass.xlsx")
+    buf = BytesIO()
+    with pd.ExcelWriter(buf, engine='xlsxwriter') as writer:
+        ws = writer.book.add_worksheet('Glass')
+        ws.insert_image('A1', 'ilogo.png', {'x_scale':0.2, 'y_scale':0.2})
+        ws.write_row('A7', ['Project Name:', project_name])
+        ws.write_row('A8', ['Project Number:', project_number])
+        ws.write_row('A9', ['Date Created:', datetime.now().strftime('%Y-%m-%d %H:%M:%S')])
+        ws.write_row('A10', ['Prepared By:', prepared_by])
+        glass_df.to_excel(writer, sheet_name='Glass', startrow=12, index=False)
+        pws = writer.book.add_worksheet('Parameters')
+        for idx, (lbl, val, unit) in enumerate(params, start=1):
+            pws.write(idx-1, 0, lbl)
+            pws.write(idx-1, 1, val)
+            pws.write(idx-1, 2, unit)
+    st.download_button('Download Glass File', buf.getvalue(), file_name=f'INO_{project_number}_SWR_Glass.xlsx')
 
     # --- AggCutOnly File Export ---
     df['Qty x 2'] = df['Qty'] * 2
-    width_counts = df.groupby('SWR Width in')['Qty'].sum().sort_values(ascending=False)
-    height_counts = df.groupby('SWR Height in')['Qty'].sum().sort_values(ascending=False)
-    unique_dims = pd.Index(width_counts.index.tolist() + height_counts.index.tolist()).unique()
+    wc = df.groupby('SWR Width in')['Qty'].sum().sort_values(ascending=False)
+    hc = df.groupby('SWR Height in')['Qty'].sum().sort_values(ascending=False)
+    dims = pd.Index(list(wc.index) + list(hc.index)).unique()
+    agg = pd.DataFrame(0, index=dims, columns=['Part #', 'Miter'] + list(df['Tag'].unique()) + ['Total QTY'])
+    agg['Part #'] = part_number
+    agg['Miter'] = '**'
+    for _, r in df.iterrows():
+        w, h, t, q2 = r['SWR Width in'], r['SWR Height in'], r['Tag'], r['Qty x 2']
+        agg.at[w, t] += q2
+        agg.at[h, t] += q2
+    agg['Total QTY'] = agg[list(df['Tag'].unique())].sum(axis=1)
+    agg = agg.reset_index().rename(columns={'index': 'Finished Length in'})
 
-    agg_df = pd.DataFrame(0, index=unique_dims,
-                          columns=['Part #','Miter'] + df['Tag'].unique().tolist() + ['Total QTY'])
-    agg_df['Part #'] = part_number
-    agg_df['Miter'] = "**"
-
-    for _, row in df.iterrows():
-        w, h, tag, q2 = row['SWR Width in'], row['SWR Height in'], row['Tag'], row['Qty x 2']
-        if tag in agg_df.columns:
-            agg_df.at[w, tag] += q2
-            agg_df.at[h, tag] += q2
-    agg_df['Total QTY'] = agg_df[df['Tag'].unique()].sum(axis=1)
-    agg_df.index.name = "Finished Length in"
-    agg_df = agg_df.reset_index()
-
-    agg_file = BytesIO()
-    with pd.ExcelWriter(agg_file, engine='xlsxwriter') as writer:
-        ws = writer.book.add_worksheet("Sheet1")
-        ws.insert_image('A1','ilogo.png',{'x_scale':0.2,'y_scale':0.2})
-        ws.write('A7',"Project Name:");    ws.write('B7', project_name)
-        ws.write('A8',"Project Number:");  ws.write('B8', project_number)
-        ws.write('A9',"Date Created:");    ws.write('B9', datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        ws.write('A10',"Prepared By:");   ws.write('B10', prepared_by)
-        ws.write('A11',"Finish:");        ws.write('B11', finish)
-        agg_df.to_excel(writer, sheet_name='Sheet1', startrow=12, index=False)
-
-    st.download_button("Download AggCutOnly File", data=agg_file.getvalue(),
-                       file_name=f"INO_{project_number}_SWR_AggCutOnly.xlsx")
+    buf2 = BytesIO()
+    with pd.ExcelWriter(buf2, engine='xlsxwriter') as writer:
+        ws = writer.book.add_worksheet('AggCutOnly')
+        ws.insert_image('A1', 'ilogo.png', {'x_scale':0.2, 'y_scale':0.2})
+        ws.write_row('A7', ['Project Name:', project_name])
+        ws.write_row('A8', ['Project Number:', project_number])
+        ws.write_row('A9', ['Date Created:', datetime.now().strftime('%Y-%m-%d %H:%M:%S')])
+        ws.write_row('A10', ['Prepared By:', prepared_by])
+        ws.write_row('A11', ['Finish:', finish])
+        agg.to_excel(writer, sheet_name='AggCutOnly', startrow=12, index=False)
+        pws = writer.book.add_worksheet('Parameters')
+        for idx, (lbl, val, unit) in enumerate(params, start=1):
+            pws.write(idx-1, 0, lbl)
+            pws.write(idx-1, 1, val)
+            pws.write(idx-1, 2, unit)
+    st.download_button('Download AggCutOnly File', buf2.getvalue(), file_name=f'INO_{project_number}_SWR_AggCutOnly.xlsx')
 
     # --- TagDetails File Export ---
-    tag_file = BytesIO()
-    with pd.ExcelWriter(tag_file, engine='xlsxwriter') as writer:
+    buf3 = BytesIO()
+    with pd.ExcelWriter(buf3, engine='xlsxwriter') as writer:
         for tag in df['Tag'].unique():
-            tag_df = df[df['Tag'] == tag]
-            rows = {'Item':[], 'Position':[], 'Quantity':[], 'Length (mm)':[], 'Length (in)':[]}
-            for idx, r in tag_df.iterrows():
-                for pos, length in [('left', r['SWR Width mm']),
-                                    ('right',r['SWR Width mm']),
-                                    ('top',  r['SWR Height mm']),
-                                    ('bottom',r['SWR Height mm'])]:
+            rows = {'Item': [], 'Position': [], 'Quantity': [], 'Length (mm)': [], 'Length (in)': []}
+            subset = df[df['Tag'] == tag]
+            for idx, r in subset.iterrows():
+                for pos, length in [('left', r['SWR Width mm']), ('right', r['SWR Width mm']),
+                                    ('top', r['SWR Height mm']), ('bottom', r['SWR Height mm'])]:
                     rows['Item'].append(idx+1)
                     rows['Position'].append(pos)
                     rows['Quantity'].append(r['Qty']*2)
                     rows['Length (mm)'].append(length)
-                    rows['Length (in)'].append(length * mm_to_inches)
-
-            tag_output_df = pd.DataFrame(rows)
+                    rows['Length (in)'].append(length*mm_to_inches)
+            tag_df = pd.DataFrame(rows)
             ws = writer.book.add_worksheet(str(tag))
-            ws.insert_image('A1','ilogo.png',{'x_scale':0.2,'y_scale':0.2})
-            ws.write('A7',"Project Name:");    ws.write('B7', project_name)
-            ws.write('A8',"Project Number:");  ws.write('B8', project_number)
-            ws.write('A9',"Date Created:");    ws.write('B9', datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-            ws.write('A10',"Prepared By:");   ws.write('B10', prepared_by)
-            tag_output_df.to_excel(writer, sheet_name=str(tag), startrow=12, index=False)
+            ws.insert_image('A1', 'ilogo.png', {'x_scale':0.2,'y_scale':0.2})
+            ws.write_row('A7', ['Project Name:', project_name])
+            ws.write_row('A8', ['Project Number:', project_number])
+            ws.write_row('A9', ['Date Created:', datetime.now().strftime('%Y-%m-%d %H:%M:%S')])
+            ws.write_row('A10', ['Prepared By:', prepared_by])
+            tag_df.to_excel(writer, sheet_name=str(tag), startrow=12, index=False)
+        pws = writer.book.add_worksheet('Parameters')
+        for idx, (lbl, val, unit) in enumerate(params, start=1):
+            pws.write(idx-1, 0, lbl)
+            pws.write(idx-1, 1, val)
+            pws.write(idx-1, 2, unit)
+    st.download_button('Download TagDetails File', buf3.getvalue(), file_name=f'INO_{project_number}_SWR_TagDetails.xlsx')
 
-    st.download_button("Download TagDetails File", data=tag_file.getvalue(),
-                       file_name=f"INO_{project_number}_SWR_TagDetails.xlsx")
-
-    # --- SWR Table Export (with all inputs) ---
-    swr_table_file = BytesIO()
-    with pd.ExcelWriter(swr_table_file, engine='xlsxwriter') as writer:
-        ws = writer.book.add_worksheet("Sheet1")
-        ws.insert_image('A1','ilogo.png',{'x_scale':0.2,'y_scale':0.2})
-        # metadata
-        ws.write('A7',"Project Name:");                   ws.write('B7', project_name)
-        ws.write('A8',"Project Number:");                 ws.write('B8', project_number)
-        ws.write('A9',"Date Created:");                   ws.write('B9', datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        ws.write('A10',"Prepared By:");                   ws.write('B10', prepared_by)
-        ws.write('A11',"Finish:");                        ws.write('B11', finish)
-        ws.write('A12',"Glass Cutting Tolerance (in):");  ws.write('B12', glass_cutting_tolerance)
-        ws.write('A13',"Joint Top (in):");                ws.write('B13', joint_top)
-        ws.write('A14',"Joint Bottom (in):");             ws.write('B14', joint_bottom)
-        ws.write('A15',"Joint Left (in):");               ws.write('B15', joint_left)
-        ws.write('A16',"Joint Right (in):");              ws.write('B16', joint_right)
-        # table itself
-        df.drop(columns=["Qty x 2"], errors="ignore")\
-          .to_excel(writer, sheet_name='Sheet1', startrow=17, index=False)
-
-    st.download_button("Download SWR Table File", data=swr_table_file.getvalue(),
-                       file_name=f"INO_{project_number}_SWR_Table.xlsx")
+    # --- SWR Table File Export ---
+    buf4 = BytesIO()
+    with pd.ExcelWriter(buf4, engine='xlsxwriter') as writer:
+        ws = writer.book.add_worksheet('Table')
+        ws.insert_image('A1', 'ilogo.png', {'x_scale':0.2,'y_scale':0.2})
+        ws.write_row('A7', ['Project Name:', project_name])
+        ws.write_row('A8', ['Project Number:', project_number])
+        ws.write_row('A9', ['Date Created:', datetime.now().strftime('%Y-%m-%d %H:%M:%S')])
+        ws.write_row('A10',['Prepared By:', prepared_by])
+        ws.write_row('A11',['Finish:', finish])
+        ws.write_row('A12',['Glass Cutting Tolerance:', glass_cutting_tolerance])
+        ws.write_row('A13',['Tolerance Unit:', tol_unit])
+        ws.write_row('A14',['Joint Top:', joint_top])
+        ws.write_row('A15',['Joint Top Unit:', top_unit])
+        ws.write_row('A16',['Joint Bottom:', joint_bottom])
+        ws.write_row('A17',['Joint Bottom Unit:', bottom_unit])
+        ws.write_row('A18',['Joint Left:', joint_left])
+        ws.write_row('A19',['Joint Left Unit:', left_unit])
+        ws.write_row('A20',['Joint Right:', joint_right])
+        ws.write_row('A21',['Joint Right Unit:', right_unit])
+        df.drop(columns=['Qty x 2'], errors='ignore').to_excel(writer, sheet_name='Table', startrow=23, index=False)
+        pws = writer.book.add_worksheet('Parameters')
+        for idx, (lbl, val, unit) in enumerate(params, start=1):
+            pws.write(idx-1, 0, lbl)
+            pws.write(idx-1, 1, val)
+            pws.write(idx-1, 2, unit)
+    st.download_button('Download SWR Table File', buf4.getvalue(), file_name=f'INO_{project_number}_SWR_Table.xlsx')
